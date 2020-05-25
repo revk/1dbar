@@ -217,7 +217,7 @@ barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    {
       c += (n ? n : 1) * v;
       n++;
-      if (v < 0 || v >= sizeof (map) / sizeof (*map))
+      if (v < 0 || v >= (int) (sizeof (map) / sizeof (*map)))
          errx (1, "Bad code 128: %d", v);
       const char *p = map[v];
       while (*p)
@@ -564,15 +564,13 @@ main (int argc, const char *argv[])
 
       if (format == 'g' && len == 12 && code[0] == '0')
       {                         // Consider reducing to UPC-E
-         if (code[10] >= '5' && code[10] <= '9' && code[6] == '0' && code[7] == '0' && code[8] == '0' && code[9] == '0'
-             && code[5] != '0')
+         if (code[10] >= '5' && code[10] <= '9' && code[6] == '0' && code[7] == '0' && code[8] == '0' && code[9] == '0' && code[5] != '0')
             len = asprintf (&code, "%.5s%c%c", code + 1, code[10], code[11]);
          else if (code[5] == '0' && code[6] == '0' && code[7] == '0' && code[8] == '0' && code[9] == '0' && code[4] != '0')
             len = asprintf (&code, "%.4s%c4%c", code + 1, code[10], code[11]);
          else if (code[3] >= '0' && code[3] <= '2' && code[4] == '0' && code[5] == '0' && code[6] == '0' && code[7] == '0')
             len = asprintf (&code, "%.2s%.3s%c%c", code + 1, code + 8, code[3], code[11]);
-         else if (code[3] >= '3' && code[3] <= '9' && code[4] == '0' && code[5] == '0' && code[6] == '0' && code[7] == '0'
-                  && code[8] == '0')
+         else if (code[3] >= '3' && code[3] <= '9' && code[4] == '0' && code[5] == '0' && code[6] == '0' && code[7] == '0' && code[8] == '0')
             len = asprintf (&code, "%.3s%.2s3%c", code + 1, code + 9, code[11]);
       }
 
