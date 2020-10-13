@@ -546,6 +546,28 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
    return total;
 }
 
+int
+barcodetelepennumeric (void *data, baradd_t * baradd, barchar_t * barchar, const char *value)
+{
+   int l = 0;
+   for (const char *c = value; *c; c++)
+      if (isdigit (*c))
+         l++;
+   char buf[(l + 1) / 2];
+   l = 0;
+   for (const char *c = value; *c; c++)
+      if (isdigit (*c))
+      {
+         if (l & 1)
+            buf[l / 2] = 27 + (buf[l / 2] - 17) * 10 + *c - '0';
+         else
+            buf[l / 2] = 17 + *c - '0';
+         l++;
+      }
+   return barcodetelepen (data, baradd, barchar, (l + 1) / 2, buf);
+
+}
+
 #ifndef LIB
 
 int debug = 0;

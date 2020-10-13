@@ -13,7 +13,8 @@ int barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *v
 int barcodeitf (void *data, baradd_t * baradd, barchar_t * barchar, const char *value, int thin, int thick);
 int barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value);
 int barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *value);
-int barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, const char *value);
+int barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, const char *value);    // ASCII
+int barcodetelepennumeric (void *data, baradd_t * baradd, barchar_t * barchar, const char *value);      // Numeric
 
 // Flags used in baradd and barchar
 #define	BAR_BLACK	1       // Bar is logically black
