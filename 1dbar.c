@@ -451,7 +451,7 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
 }
 
 int
-bartelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, const char *value)
+barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, const char *value)
 {
    int flag = 0,
       total = 0;
@@ -770,7 +770,7 @@ main (int argc, const char *argv[])
       if (format == 'c')
          barcode128 (NULL, &baradd, &barchar, code);
       if (format == 't')
-         bartelepen (NULL, &baradd, &barchar, strlen (code), code);
+         barcodetelepen (NULL, &baradd, &barchar, strlen (code), code);
       fclose (path);
       if (len == 14)
       {                         // GTIN-14
