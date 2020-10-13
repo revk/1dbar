@@ -597,6 +597,7 @@ main (int argc, const char *argv[])
          {"c39", 0, POPT_ARG_VAL, &format, '3', "Code 39"},
          {"c128", 0, POPT_ARG_VAL, &format, 'c', "Codebar 128"},
          {"telepen", 0, POPT_ARG_VAL, &format, 't', "Telepen"},
+         {"telepen-numeric", 0, POPT_ARG_VAL, &format, 'n', "Telepen"},
          {"codabar", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &format, 'c', "Codebar 128"},
          {"mm", 's', POPT_ARG_DOUBLE, &unitsize, 0, "Unit size", "mm"},
          {"dpi", 'd', POPT_ARG_DOUBLE, &unitdpi, 0, "Unit dpi", "dpi"},
@@ -793,6 +794,8 @@ main (int argc, const char *argv[])
          barcode128 (NULL, &baradd, &barchar, code);
       if (format == 't')
          barcodetelepen (NULL, &baradd, &barchar, strlen (code), code);
+      if (format == 'n')
+         barcodetelepennumeric (NULL, &baradd, &barchar, code);
       fclose (path);
       if (len == 14)
       {                         // GTIN-14
