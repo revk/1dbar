@@ -360,12 +360,12 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          digit (value[q] - '0', BAR_BELOW);
       }
       guard (6);
+      chars (value + q, 1, 7, BAR_BELOW | BAR_LEFT);
       bar (right, BAR_QUIET);
-      chars (value + q, 1, 5, BAR_BELOW | BAR_RIGHT);
    } else if (l == 8)
    {                            // EAN-8
-      chars ("<", 1, 7, BAR_BELOW | BAR_LEFT);
       bar (left, BAR_QUIET);
+      chars ("<", 1, 7, BAR_BELOW | BAR_RIGHT);
       guard (3);
       for (q = 0; q < l; q++)
       {
@@ -375,13 +375,13 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
             guard (5);
       }
       guard (3);
-      bar (right, BAR_QUIET);
       if (!a)
-         chars (">", 1, 7, BAR_BELOW | BAR_RIGHT);
+         chars (">", 1, 7, BAR_BELOW | BAR_LEFT);
+      bar (right, BAR_QUIET);
    } else if (l == 12)
    {                            // UPC-A
-      chars (value, 1, 5, BAR_BELOW | BAR_LEFT);
       bar (left, BAR_QUIET);
+      chars (value, 1, 7, BAR_BELOW | BAR_RIGHT);
       guard (3);
       digit (value[0] - '0', 0);
       for (q = 1; q < l - 1; q++)
@@ -393,8 +393,8 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
       }
       digit (value[q] - '0', 0);
       guard (3);
+      chars (value + q, 1, 7, BAR_BELOW | BAR_LEFT);
       bar (right, BAR_QUIET);
-      chars (value + q, 1, 5, BAR_BELOW | BAR_RIGHT);
    } else if (l == 13)
    {                            // EAN-13
       const int leftswap[] = { 0, 0x34, 0x2c, 0x1c, 0x32, 0x26, 0x0e, 0x2a, 0x1a, 0x16 };
@@ -444,8 +444,8 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          }
       }
       // bar (5, BAR_QUIET); // GS-1 spec, but silly
+      chars (">", 1, 7, BAR_ABOVE | BAR_LEFT);
       bar (7, BAR_QUIET);
-      chars (">", 1, 7, BAR_ABOVE | BAR_RIGHT);
    }
    return total;
 }
