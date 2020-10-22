@@ -21,6 +21,8 @@ barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value
    {
       if (!barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
+      if (flags & BAR_QUIET)
+         flag &= ~BAR_BLACK;
       if (baradd)
          total += baradd (data, width, flags | flag);
       else
