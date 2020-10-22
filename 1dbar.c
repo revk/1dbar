@@ -399,8 +399,8 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    {                            // EAN-13
       const int leftswap[] = { 0, 0x34, 0x2c, 0x1c, 0x32, 0x26, 0x0e, 0x2a, 0x1a, 0x16 };
       reverse = leftswap[value[0] - '0'];
-      chars (value, 1, 7, BAR_BELOW | BAR_LEFT);
       bar (left, BAR_QUIET);
+      chars (value, 1, 7, BAR_BELOW | BAR_RIGHT);
       guard (3);
       for (q = 1; q < l; q++)
       {
@@ -410,9 +410,9 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
             guard (5);
       }
       guard (3);
-      bar (right, BAR_QUIET);
       if (!a)
-         chars (">", 1, 7, BAR_BELOW | BAR_RIGHT);
+         chars (">", 1, 7, BAR_BELOW | BAR_LEFT);
+      bar (right, BAR_QUIET);
    }
    if (a)
    {                            // Add-on
