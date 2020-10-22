@@ -110,6 +110,8 @@ barcodeitf (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    {
       if (!barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
+      if (flags & BAR_QUIET)
+         flag &= ~BAR_BLACK;
       if (baradd)
          total += baradd (data, width, flags | flag);
       else
@@ -190,6 +192,8 @@ barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    {
       if (!barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
+      if (flags & BAR_QUIET)
+         flag &= ~BAR_BLACK;
       if (baradd)
          total += baradd (data, width, flags | flag);
       else
@@ -290,6 +294,8 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    {
       if (!barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
+      if (flags & BAR_QUIET)
+         flag &= ~BAR_BLACK;
       if (baradd)
          total += baradd (data, width, flags | flag);
       else
