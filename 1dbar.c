@@ -352,7 +352,7 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
       const int cs[] = { 0x07, 0x0b, 0x13, 0x23, 0x0d, 0x19, 0x31, 0x15, 0x25, 0x29 };
       reverse = cs[value[l - 1] - '0'];
       bar (left, BAR_QUIET);
-      chars ("0", 1, 5, BAR_BELOW|BAR_RIGHT);
+      chars ("0", 1, 5, BAR_BELOW | BAR_RIGHT);
       guard (3);
       for (q = 0; q < 6; q++)
       {
