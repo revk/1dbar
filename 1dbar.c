@@ -45,7 +45,7 @@ barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value
       if (barchar)
       {
          char t[] = { c };
-         barchar (data, t, 1, 3 * thick + 6 * thin, BAR_BELOW);
+         barchar (data, t, 1, 0, 3 * thick + 6 * thin, 9, BAR_BELOW);
       }
       const char *found = strchr (code39, c);
       if (found)
@@ -137,7 +137,7 @@ barcodeitf (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          if (barchar)
          {
             char txt[] = { prev, c };
-            barchar (data, txt, 2, thin * 6 + thick * 4, BAR_BELOW);
+            barchar (data, txt, 2, 0, thin * 6 + thick * 4, 10, BAR_BELOW);
          }
          sum += (c - '0');
          int B = prev - '0';
@@ -246,7 +246,7 @@ barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          int r = 1;
          while (isdigit (value[r]))
             r++;
-         if ((r > 4 && !(r & 1)) || (r == 4 && !value[r]))
+         if (r >= 4)            //(r > 4 && !(r & 1)) || (r == 4 && !value[r]))
             newset = 'C';
       }
       if (*value < 0x02)
@@ -264,17 +264,17 @@ barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
       if (set == 'A')
       {
          if (barchar)
-            barchar (data, value, 1, 11, BAR_BELOW);
+            barchar (data, value, 1, 0, 11, 7, BAR_BELOW);
          addcode (*value < 0x20 ? *value + 0x40 : *value - 0x20, BAR_DATA | BAR_BELOW);
       } else if (set == 'B')
       {
          if (barchar)
-            barchar (data, value, 1, 11, BAR_BELOW);
+            barchar (data, value, 1, 0, 11, 7, BAR_BELOW);
          addcode (*value - 0x20, BAR_DATA | BAR_BELOW);
       } else if (set == 'C')
       {
          if (barchar)
-            barchar (data, value, 2, 11, BAR_BELOW);
+            barchar (data, value, 2, 0, 11, 5, BAR_BELOW);
          addcode ((*value - '0') * 10 + value[1] - '0', BAR_DATA | BAR_BELOW);
          value++;
       }
@@ -303,10 +303,10 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
       flag ^= BAR_BLACK;
       total += width;
    }
-   void chars (const char *txt, int n, int w, int flags)
+   void chars (const char *txt, int n, int dx, int w, int h, int flags)
    {
       if (barchar)
-         barchar (data, txt, n, w, flags);
+         barchar (data, txt, n, dx, w, h, flags);
    }
    const char *p,
     *a = NULL;
@@ -359,76 +359,69 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    {                            // UPC-E
       const int cs[] = { 0x07, 0x0b, 0x13, 0x23, 0x0d, 0x19, 0x31, 0x15, 0x25, 0x29 };
       reverse = cs[value[l - 1] - '0'];
-      bar (left - 1, BAR_QUIET);
-      chars ("0", 1, 5, BAR_BELOW | BAR_RIGHT);
-      bar (1, BAR_QUIET);
+      bar (left, BAR_QUIET);
+      chars ("0", 1, -6, 6, 5, BAR_BELOW);
       guard (3);
+      chars (value, 6, 0, 7 * 6 + 1, 7, BAR_BELOW);
       for (q = 0; q < 6; q++)
-      {
-         chars (value + q, 1, 7, BAR_BELOW);
          digit (value[q] - '0', BAR_BELOW);
-      }
       guard (6);
-      bar (1, BAR_QUIET);
-      chars (value + q, 1, 5, BAR_BELOW | BAR_LEFT);
-      bar (right - 1, BAR_QUIET);
+      chars (value + q, 1, 0, 6, 5, BAR_BELOW);
+      bar (right, BAR_QUIET);
    } else if (l == 8)
    {                            // EAN-8
-      bar (left - 1, BAR_QUIET);
-      chars ("<", 1, 7, BAR_BELOW | BAR_RIGHT);
-      bar (1, BAR_QUIET);
+      bar (left, BAR_QUIET);
+      chars ("<", 1, -8, 8, 7, BAR_BELOW);
       guard (3);
       for (q = 0; q < l; q++)
       {
-         chars (value + q, 1, 7, BAR_BELOW);
+         if (!q || q == 4)
+            chars (value + q, 4, q ? -1 : 0, 7 * 4 + 1, 7, BAR_BELOW);
          digit (value[q] - '0', BAR_BELOW);
          if (q == 3)
             guard (5);
       }
       guard (3);
-      bar (1, BAR_QUIET);
       if (!a)
-         chars (">", 1, 7, BAR_BELOW | BAR_LEFT);
-      bar (right - 1, BAR_QUIET);
+         chars (">", 1, 0, 8, 7, BAR_BELOW);
+      bar (right, BAR_QUIET);
    } else if (l == 12)
    {                            // UPC-A
-      bar (left - 1, BAR_QUIET);
-      chars (value, 1, 5, BAR_BELOW | BAR_RIGHT);
-      bar (1, BAR_QUIET);
+      bar (left, BAR_QUIET);
+      chars (value, 1, -6, 6, 5, BAR_BELOW);
       guard (3);
       digit (value[0] - '0', 0);
       for (q = 1; q < l - 1; q++)
       {
-         chars (value + q, 1, 7, BAR_BELOW);
+         if (q == 1 || q == 6)
+            chars (value + q, 5, q > 1 ? -1 : 0, 7 * 5 + 1, 7, BAR_BELOW);
          digit (value[q] - '0', BAR_BELOW);
          if (q == 5)
             guard (5);
       }
       digit (value[q] - '0', 0);
       guard (3);
-      bar (1, BAR_QUIET);
-      chars (value + q, 1, 5, BAR_BELOW | BAR_LEFT);
-      bar (right - 1, BAR_QUIET);
+      chars (value + q, 1, 0, 6, 5, BAR_BELOW);
+      bar (right, BAR_QUIET);
    } else if (l == 13)
    {                            // EAN-13
       const int leftswap[] = { 0, 0x34, 0x2c, 0x1c, 0x32, 0x26, 0x0e, 0x2a, 0x1a, 0x16 };
       reverse = leftswap[value[0] - '0'];
-      bar (left - 1, BAR_QUIET);
-      chars (value, 1, 7, BAR_BELOW | BAR_RIGHT);
-      bar (1, BAR_QUIET);
+      bar (left, BAR_QUIET);
+      chars (value, 1, -8, 8, 7, BAR_BELOW);
       guard (3);
       for (q = 1; q < l; q++)
       {
-         chars (value + q, 1, 7, BAR_BELOW);
+         if (q == 1 || q == 7)
+            chars (value + q, 6, 0, 6 * 7 + 1, 7, BAR_BELOW);
          digit (value[q] - '0', BAR_BELOW);
          if (q == 6)
             guard (5);
       }
       guard (3);
-      bar (1, BAR_QUIET);
       if (!a)
-         chars (">", 1, 7, BAR_BELOW | BAR_LEFT);
-      bar (right - 1, BAR_QUIET);
+         chars (">", 1, 0, 8, 7, BAR_BELOW);
+      bar (right, BAR_QUIET);
    }
    if (a)
    {                            // Add-on
@@ -451,7 +444,7 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
       bar (2, BAR_GUARD | BAR_ABOVE);
       for (q = 0; q < al; q++)
       {
-         chars (a + q, 1, 7, BAR_ABOVE);
+         chars (a + q, 1, 0, 9, 7, BAR_ABOVE);
          digit (a[q] - '0', BAR_ABOVE);
          if (q + 1 < al)
          {
@@ -460,7 +453,7 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          }
       }
       // bar (5, BAR_QUIET); // GS-1 spec, but silly
-      chars (">", 1, 7, BAR_ABOVE | BAR_LEFT);
+      chars (">", 1, 0, 7, 7, BAR_ABOVE);
       bar (7, BAR_QUIET);
    }
    return total;
@@ -483,10 +476,10 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
          total += width;
       flag ^= BAR_BLACK;
    }
-   void chars (const char *txt, int n, int w, int flags)
+   void chars (const char *txt, int n, int dx, int w, int h, int flags)
    {
       if (barchar)
-         barchar (data, txt, n, w, flags);
+         barchar (data, txt, n, dx, w, h, flags);
    }
    // Compose bits
    unsigned char bits[len + 3];
@@ -512,13 +505,12 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
    add (csum);
    add ('z');
    // Make barcode
-   bar (8, BAR_QUIET);          // Assuming 4 is sensible
+   bar (8, BAR_QUIET);          // Assuming 8 is sensible
    int n = q * 8;
+   chars (value, len, 0, n*2, 7, BAR_BELOW);
    q = 0;
    while (q < n)
    {
-      if (q == 8)
-         chars (value, len, len * 8 * 3, BAR_BELOW | BAR_LEFT);
       if (bits[q / 8] & (1 << (q & 7)))
       {                         // 1
          bar (1, BAR_DATA | BAR_BELOW);
@@ -560,7 +552,7 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
       bar (1, BAR_DATA | BAR_BELOW);    // End run
       bar (3, BAR_DATA | BAR_BELOW);
    }
-   bar (8, BAR_QUIET);          // Assuming 4 is sensible
+   bar (8, BAR_QUIET);          // Assuming 8 is sensible
    return total;
 }
 
@@ -764,7 +756,7 @@ main (int argc, const char *argv[])
                   else
                      l -= fh * u * 1.464;
 #endif
-               } else if (!(flags & BAR_GUARD) || len == 14)
+               } else if ((flags & BAR_BELOW) || len == 14)
                   l -= fh * u;  // space for digits below
                else
                   l -= fh * u * 0.464;  // shorted bars anyway when digits apply
@@ -774,18 +766,17 @@ main (int argc, const char *argv[])
          w += n;
          return n;
       }
-      void barchar (void *ptr, const char *txt, int c, int n, int flags)
+      void barchar (void *ptr, const char *txt, int c, int dx, int n, int cw, int flags)
       {
          if (!text)
             return;
          xml_t t = xml_addf (text, "+text", "%.*s", c, txt);
-         double cw = (double) n / c;
          if (cw < 7)
             xml_addf (t, "@font-size", "%.2f", fontadjust * fh * u * cw / unitsize / 7);
          if (flags & (BAR_RIGHT | BAR_LEFT))
-            xml_addf (t, "@x", "%d", w);
+            xml_addf (t, "@x", "%d", (w + dx));
          else
-            xml_addf (t, "@x", "%.1f", (double) w + (double) n / 2);
+            xml_addf (t, "@x", "%.1f", (double) (w + dx) + (double) n / 2);
          if (flags & BAR_ABOVE)
             xml_addf (t, "@y", "%.2f", fh * u * cw / unitsize * 0.92 / 7);
          else

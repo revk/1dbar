@@ -3,7 +3,7 @@
 
 // Callback functions (return width added)
 typedef int baradd_t (void *data, int w, int flags);    // function that adds next bar
-typedef void barchar_t (void *data, const char *text, int n, int w, int flags); // function that adds text
+typedef void barchar_t (void *data, const char *text, int n, int dx, int w, int h,int flags); // function that adds text (n chars of text, at offset dx w units, font based on h width
 
 // Barcode generation functions - these call the callback functions
 // baradd is called in turn for each bar from left to right starting with quiet zone
