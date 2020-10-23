@@ -18,6 +18,7 @@ typedef struct
    barchar_t *barchar;          // Function for adding characters
    void *data;                  // Data to pass to function
    unsigned char numeric:1;     // Flag alternative numeric coding
+   unsigned char checkdigit:1;  // Work out check digit (writes to value)
 } barcode_t;
 void barcode39_opts (barcode_t);
 #define	barcode39(...) barcode39_opts((barcode_t){__VA_ARGS__})

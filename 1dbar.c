@@ -310,6 +310,7 @@ barcodeean_opts (barcode_t o)
    }
    if (*p)
       return;                   // not digits
+   if (o.checkdigit)
    {
       int c = 0;
       for (int n = 0; n < l - 1; n++)
