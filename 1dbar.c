@@ -411,7 +411,7 @@ barcodeean_opts (barcode_t o)
       for (q = 1; q < l; q++)
       {
          if (q == 1 || q == 7)
-            chars (o.value + q, 6, 0, 6 * 7 + 1, 7, BAR_BELOW);
+            chars (o.value + q, 6, q > 1 ? -1 : 0, 6 * 7 + 1, 7, BAR_BELOW);
          digit (o.value[q] - '0', BAR_BELOW);
          if (q == 6)
             guard (5);
