@@ -16,7 +16,7 @@ void
 barcode39_opts (barcode_t o)
 {
    if (!o.thin)
-      o.thin = 5;
+      o.thin = 2;
    if (!o.thick)
       o.thick = o.thin * 5 / 2;
    int flag = 0;
@@ -104,7 +104,7 @@ void
 barcodeitf_opts (barcode_t o)
 {
    if (!o.thin)
-      o.thin = 5;
+      o.thin = 2;
    if (!o.thick)
       o.thick = o.thin * 5 / 2;
    int flag = 0;
