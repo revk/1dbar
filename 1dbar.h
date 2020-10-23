@@ -2,19 +2,33 @@
 // (c) 2019 Adrian Kennard
 
 // Callback functions (return width added)
-typedef int baradd_t (void *data, int w, int flags);    // function that adds next bar
-typedef void barchar_t (void *data, const char *text, int n, int dx, int w, int h,int flags); // function that adds text (n chars of text, at offset dx w units, font based on h width
+typedef void baradd_t (void *data, int w, int flags);   // function that adds next bar
+typedef void barchar_t (void *data, const char *text, int n, int dx, int w, int cw, int flags); // function that adds text (n chars of text, at offset dx w units, font based on cw character width
 
 // Barcode generation functions - these call the callback functions
 // baradd is called in turn for each bar from left to right starting with quiet zone
 // barchar is called for characters or strings, interleaved with the bars
-// return value is number of units total (including quiet zones). Can be called with NULL baradd/barchar to test
-int barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value, int thin, int thick);
-int barcodeitf (void *data, baradd_t * baradd, barchar_t * barchar, const char *value, int thin, int thick);
-int barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value);
-int barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *value);
-int barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, const char *value);    // ASCII
-int barcodetelepennumeric (void *data, baradd_t * baradd, barchar_t * barchar, const char *value);      // Numeric
+typedef struct
+{
+   char *value;                 // The barcode content
+   unsigned char len;           // If needed for type of barcode
+   unsigned char thin;          // If needed for type of barcode
+   unsigned char thick;         // If needed for type of barcode
+   baradd_t *baradd;            // Function for adding bars
+   barchar_t *barchar;          // Function for adding characters
+   void *data;                  // Data to pass to function
+   unsigned char numeric:1;     // Flag alternative numeric coding
+} barcode_t;
+void barcode39_opts (barcode_t);
+#define	barcode39(...) barcode39_opts((barcode_t){__VA_ARGS__})
+void barcodeitf_opts (barcode_t);
+#define	barcodeitf(...) barcodeitf_opts((barcode_t){__VA_ARGS__})
+void barcode128_opts (barcode_t);
+#define	barcode128(...) barcode128_opts((barcode_t){__VA_ARGS__})
+void barcodeean_opts (barcode_t);
+#define	barcodeean(...) barcodeean_opts((barcode_t){__VA_ARGS__})
+void barcodetelepen_opts (barcode_t);
+#define	barcodetelepen(...) barcodetelepen_opts((barcode_t){__VA_ARGS__})
 
 // Flags used in baradd and barchar
 #define	BAR_BLACK	1       // Bar is logically black

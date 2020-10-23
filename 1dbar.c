@@ -1,7 +1,6 @@
 // 1D barcodes
 // (c) Copyright Adrian Kennard
 
-#include <1dbar.h>
 #include <string.h>
 #include <ctype.h>
 #include <popt.h>
@@ -9,26 +8,27 @@
 #include <axl.h>
 #include <err.h>
 #include <stdio.h>
+#include "1dbar.h"
 
 // https://www.gs1.org/docs/barcodes/GS1_General_Specifications.pdf
 
-int
-barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value, int thin, int thick)
+void
+barcode39_opts (barcode_t o)
 {
-   int flag = 0,
-      total = 0;
+   if (!o.thin)
+      o.thin = 5;
+   if (!o.thick)
+      o.thick = o.thin * 5 / 2;
+   int flag = 0;
    void bar (int width, int flags)
    {
-      if (!barchar)
+      if (!o.barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
       if (flags & BAR_QUIET)
          flag &= ~BAR_BLACK;
-      if (baradd)
-         total += baradd (data, width, flags | flag);
-      else
-         total += width;
+      if (o.baradd)
+         o.baradd (o.data, width, flags | flag);
       flag ^= BAR_BLACK;
-      total += width;
    }
    const char *asciimap[128] = {
       "%U", "$A", "$B", "$C", "$D", "$E", "$F", "$G", "$H", "$I", "$J", "$K", "$L", "$M", "$N", "$O", "$P", "$Q", "$R", "$S", "$T", "$U", "$V", "$W", "$X", "$Y", "$Z", "%A", "%B", "%C", "%D", "$E",   //
@@ -41,11 +41,11 @@ barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value
    void add39 (int c)
    {
       if (count++)
-         bar (thin, BAR_GUARD);
-      if (barchar)
+         bar (o.thin, BAR_GUARD);
+      if (o.barchar)
       {
          char t[] = { c };
-         barchar (data, t, 1, 0, 3 * thick + 6 * thin, 9, BAR_BELOW);
+         o.barchar (o.data, t, 1, 0, 3 * o.thick + 6 * o.thin, 9, BAR_BELOW);
       }
       const char *found = strchr (code39, c);
       if (found)
@@ -57,26 +57,26 @@ barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value
             B++;
          if (B >= 11)
             B++;
-         bar ((B & 1) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S == 3) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B & 2) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S == 0) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B & 4) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S == 1) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B & 8) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S == 2) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B == 1 || B == 2 || B == 4 || B == 8) ? thick : thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 1) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S == 3) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 2) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S == 0) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 4) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S == 1) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 8) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S == 2) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B == 1 || B == 2 || B == 4 || B == 8) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
       } else
       {                         // special
-         bar (thin, BAR_DATA | BAR_BELOW);
-         bar (c == '%' ? thin : thick, BAR_DATA | BAR_BELOW);
-         bar (thin, BAR_DATA | BAR_BELOW);
-         bar (c == '+' ? thin : thick, BAR_DATA | BAR_BELOW);
-         bar (thin, BAR_DATA | BAR_BELOW);
-         bar (c == '/' ? thin : thick, BAR_DATA | BAR_BELOW);
-         bar (thin, BAR_DATA | BAR_BELOW);
-         bar (c == '$' ? thin : thick, BAR_DATA | BAR_BELOW);
-         bar (thin, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
+         bar (c == '%' ? o.thin : o.thick, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
+         bar (c == '+' ? o.thin : o.thick, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
+         bar (c == '/' ? o.thin : o.thick, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
+         bar (c == '$' ? o.thin : o.thick, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
       }
    }
    void add (unsigned int c)
@@ -87,43 +87,42 @@ barcode39 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value
       for (; *map; map++)
          add39 (*map);
    }
-   bar (thin * 10, BAR_QUIET);
+   bar (o.thin * 10, BAR_QUIET);
    add39 ('*');
-   const char *p = value + strlen (value) - 1;
-   if (*value == '*' && *p == '*')      // Assume *'s are start/end markers
-      for (value++; value < p; value++)
-         add (*value);
+   const char *p = o.value + strlen (o.value) - 1;
+   if (*o.value == '*' && *p == '*')    // Assume *'s are start/end markers
+      for (o.value++; o.value < p; o.value++)
+         add (*o.value);
    else                         // Assume no start end markers
-      for (; *value; value++)
-         add (*value);
+      for (; *o.value; o.value++)
+         add (*o.value);
    add39 ('*');
-   bar (thin * 10, BAR_QUIET);
-   return total;
+   bar (o.thin * 10, BAR_QUIET);
 }
 
-int
-barcodeitf (void *data, baradd_t * baradd, barchar_t * barchar, const char *value, int thin, int thick)
+void
+barcodeitf_opts (barcode_t o)
 {
-   int flag = 0,
-      total = 0;
+   if (!o.thin)
+      o.thin = 5;
+   if (!o.thick)
+      o.thick = o.thin * 5 / 2;
+   int flag = 0;
    void bar (int width, int flags)
    {
-      if (!barchar)
+      if (!o.barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
       if (flags & BAR_QUIET)
          flag &= ~BAR_BLACK;
-      if (baradd)
-         total += baradd (data, width, flags | flag);
-      else
-         total += width;
+      if (o.baradd)
+         o.baradd (o.data, width, flags | flag);
       flag ^= BAR_BLACK;
-      total += width;
    }
-   bar (thin * 10, BAR_QUIET);
-   bar (thin, BAR_GUARD);
-   bar (thin, BAR_GUARD);
-   bar (thin, BAR_GUARD);
-   bar (thin, BAR_GUARD);
+   bar (o.thin * 10, BAR_QUIET);
+   bar (o.thin, BAR_GUARD);
+   bar (o.thin, BAR_GUARD);
+   bar (o.thin, BAR_GUARD);
+   bar (o.thin, BAR_GUARD);
    char prev = 0;
    int sum = 0;
    void digit (char c)
@@ -134,10 +133,10 @@ barcodeitf (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          sum += (c - '0') * 2;
       } else
       {
-         if (barchar)
+         if (o.barchar)
          {
             char txt[] = { prev, c };
-            barchar (data, txt, 2, 0, thin * 6 + thick * 4, 10, BAR_BELOW);
+            o.barchar (o.data, txt, 2, 0, o.thin * 6 + o.thick * 4, 10, BAR_BELOW);
          }
          sum += (c - '0');
          int B = prev - '0';
@@ -159,47 +158,42 @@ barcodeitf (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
             S++;
          if (S == 1 || S == 2 || S == 4 || S == 8)
             S += 16;
-         bar ((B & 1) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S & 1) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B & 2) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S & 2) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B & 4) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S & 4) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B & 8) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S & 8) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((B & 16) ? thick : thin, BAR_DATA | BAR_BELOW);
-         bar ((S & 16) ? thick : thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 1) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S & 1) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 2) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S & 2) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 4) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S & 4) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 8) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S & 8) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((B & 16) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
+         bar ((S & 16) ? o.thick : o.thin, BAR_DATA | BAR_BELOW);
       }
    }
-   for (; *value; value++)
-      if (isdigit (*value))
-         digit (*value);
+   for (; *o.value; o.value++)
+      if (isdigit (*o.value))
+         digit (*o.value);
    if (prev)
       digit ('0' + sum * 9 % 10);       // LUHN check digit
-   bar (thick, BAR_GUARD);
-   bar (thin, BAR_GUARD);
-   bar (thin, BAR_GUARD);
-   bar (thin * 10, BAR_QUIET);
-   return total;
+   bar (o.thick, BAR_GUARD);
+   bar (o.thin, BAR_GUARD);
+   bar (o.thin, BAR_GUARD);
+   bar (o.thin * 10, BAR_QUIET);
 }
 
-int
-barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *value)
+void
+barcode128_opts (barcode_t o)
 {
-   int flag = 0,
-      total = 0;
+   int flag = 0;
    void bar (int width, int flags)
    {
-      if (!barchar)
+      if (!o.barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
       if (flags & BAR_QUIET)
          flag &= ~BAR_BLACK;
-      if (baradd)
-         total += baradd (data, width, flags | flag);
-      else
-         total += width;
+      if (o.baradd)
+         o.baradd (o.data, width, flags | flag);
       flag ^= BAR_BLACK;
-      total += width;
    }
    const char *map[107] = { "212222", "222122", "222221", "121223", "121322", "131222", "122213",
       "122312", "132212", "221213", "221312", "231212", "112232", "122132",
@@ -237,23 +231,23 @@ barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    }
    bar (10, BAR_QUIET);
    char set = 0;
-   for (; *value; value++)
+   for (; *o.value; o.value++)
    {
       char newset = 0;
       // TODO we can be way smarter and use shift characters and so on...
-      if (isdigit (*value))
+      if (isdigit (*o.value))
       {                         // Maybe use set C
          int r = 1;
-         while (isdigit (value[r]))
+         while (isdigit (o.value[r]))
             r++;
-         if (r >= 4)            //(r > 4 && !(r & 1)) || (r == 4 && !value[r]))
+         if (r >= 4)            //(r > 4 && !(r & 1)) || (r == 4 && !o.value[r]))
             newset = 'C';
       }
-      if (*value < 0x02)
+      if (*o.value < 0x02)
          newset = 'A';
-      if (*value >= 0x60)
+      if (*o.value >= 0x60)
          newset = 'B';
-      if (!newset && set == 'C' && (!isdigit (*value) || !isdigit (value[1])))
+      if (!newset && set == 'C' && (!isdigit (*o.value) || !isdigit (o.value[1])))
          newset = 'B';
       if (!newset && !set)
          newset = 'B';
@@ -263,55 +257,50 @@ barcode128 (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          addcode (101 - ((set = newset) - 'A'), BAR_DATA);
       if (set == 'A')
       {
-         if (barchar)
-            barchar (data, value, 1, 0, 11, 7, BAR_BELOW);
-         addcode (*value < 0x20 ? *value + 0x40 : *value - 0x20, BAR_DATA | BAR_BELOW);
+         if (o.barchar)
+            o.barchar (o.data, o.value, 1, 0, 11, 7, BAR_BELOW);
+         addcode (*o.value < 0x20 ? *o.value + 0x40 : *o.value - 0x20, BAR_DATA | BAR_BELOW);
       } else if (set == 'B')
       {
-         if (barchar)
-            barchar (data, value, 1, 0, 11, 7, BAR_BELOW);
-         addcode (*value - 0x20, BAR_DATA | BAR_BELOW);
+         if (o.barchar)
+            o.barchar (o.data, o.value, 1, 0, 11, 7, BAR_BELOW);
+         addcode (*o.value - 0x20, BAR_DATA | BAR_BELOW);
       } else if (set == 'C')
       {
-         if (barchar)
-            barchar (data, value, 2, 0, 11, 5, BAR_BELOW);
-         addcode ((*value - '0') * 10 + value[1] - '0', BAR_DATA | BAR_BELOW);
-         value++;
+         if (o.barchar)
+            o.barchar (o.data, o.value, 2, 0, 11, 5, BAR_BELOW);
+         addcode ((*o.value - '0') * 10 + o.value[1] - '0', BAR_DATA | BAR_BELOW);
+         o.value++;
       }
    }
    addcode (c % 103, BAR_DATA);
    addcode (106, BAR_GUARD);
    bar (10, BAR_QUIET);
-   return total;
 }
 
-int
-barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *value)
+void
+barcodeean_opts (barcode_t o)
 {                               // This handles a range of EAN/UPC formats including UPC-E (7 digits), UPC-A (12 digits), EAN-8 (8 digits), EAN=13 (13 digits)
-   int flag = 0,
-      total = 0;
+   int flag = 0;
    void bar (int width, int flags)
    {
-      if (!barchar)
+      if (!o.barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
       if (flags & BAR_QUIET)
          flag &= ~BAR_BLACK;
-      if (baradd)
-         total += baradd (data, width, flags | flag);
-      else
-         total += width;
+      if (o.baradd)
+         o.baradd (o.data, width, flags | flag);
       flag ^= BAR_BLACK;
-      total += width;
    }
-   void chars (const char *txt, int n, int dx, int w, int h, int flags)
+   void chars (const char *txt, int n, int dx, int w, int cw, int flags)
    {
-      if (barchar)
-         barchar (data, txt, n, dx, w, h, flags);
+      if (o.barchar)
+         o.barchar (o.data, txt, n, dx, w, cw, flags);
    }
    const char *p,
     *a = NULL;
-   for (p = value; *p && isdigit (*p); p++);
-   int l = p - value;
+   for (p = o.value; *p && isdigit (*p); p++);
+   int l = p - o.value;
    if (*p == '-' && isdigit (p[1]))
    {                            // Add-on
       p++;
@@ -320,7 +309,15 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
          p++;
    }
    if (*p)
-      return 0;                 // not digits
+      return;                   // not digits
+   {
+      int c = 0;
+      for (int n = 0; n < l - 1; n++)
+         c += (o.value[n] - '0') * (((l - n) & 1) ? 1 : 3);
+      o.value[l - 1] = '0' + (10 - (c % 10)) % 10;
+   }
+   // Check digit
+
    int reverse = 0,
       q;
    void digit (int d, int flags)
@@ -358,70 +355,70 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
    if (l == 7)
    {                            // UPC-E
       const int cs[] = { 0x07, 0x0b, 0x13, 0x23, 0x0d, 0x19, 0x31, 0x15, 0x25, 0x29 };
-      reverse = cs[value[l - 1] - '0'];
+      reverse = cs[o.value[l - 1] - '0'];
+      chars ("0", 1, 0, 6, 5, BAR_BELOW | BAR_LEFT);    // Left of quiet (as per GS-1 spec)
       bar (left, BAR_QUIET);
-      chars ("0", 1, -6, 6, 5, BAR_BELOW);
       guard (3);
-      chars (value, 6, 0, 7 * 6 + 1, 7, BAR_BELOW);
+      chars (o.value, 6, 0, 7 * 6 + 1, 7, BAR_BELOW);
       for (q = 0; q < 6; q++)
-         digit (value[q] - '0', BAR_BELOW);
+         digit (o.value[q] - '0', BAR_BELOW);
       guard (6);
-      chars (value + q, 1, 0, 6, 5, BAR_BELOW);
       bar (right, BAR_QUIET);
+      chars (o.value + q, 1, 0, 6, 5, BAR_BELOW | BAR_RIGHT);   // Right of quiet (as per GS-1 spec)
    } else if (l == 8)
    {                            // EAN-8
+      chars ("<", 1, 0, 8, 7, BAR_BELOW | BAR_LEFT);    // Left of quiet (as per GS-1 spec)
       bar (left, BAR_QUIET);
-      chars ("<", 1, -8, 8, 7, BAR_BELOW);
       guard (3);
       for (q = 0; q < l; q++)
       {
          if (!q || q == 4)
-            chars (value + q, 4, q ? -1 : 0, 7 * 4 + 1, 7, BAR_BELOW);
-         digit (value[q] - '0', BAR_BELOW);
+            chars (o.value + q, 4, q ? -1 : 0, 7 * 4 + 1, 7, BAR_BELOW);
+         digit (o.value[q] - '0', BAR_BELOW);
          if (q == 3)
             guard (5);
       }
       guard (3);
-      if (!a)
-         chars (">", 1, 0, 8, 7, BAR_BELOW);
       bar (right, BAR_QUIET);
+      if (!a)
+         chars (">", 1, 0, 8, 7, BAR_BELOW | BAR_RIGHT);        // Right of quiet (as per GS-1 spec)
    } else if (l == 12)
    {                            // UPC-A
+      chars (o.value, 1, 0, 6, 5, BAR_BELOW | BAR_LEFT);        // Left of quiet (as per GS-1 spec)
       bar (left, BAR_QUIET);
-      chars (value, 1, -6, 6, 5, BAR_BELOW);
       guard (3);
-      digit (value[0] - '0', 0);
+      digit (o.value[0] - '0', 0);
       for (q = 1; q < l - 1; q++)
       {
          if (q == 1 || q == 6)
-            chars (value + q, 5, q > 1 ? -1 : 0, 7 * 5 + 1, 7, BAR_BELOW);
-         digit (value[q] - '0', BAR_BELOW);
+            chars (o.value + q, 5, q > 1 ? -1 : 0, 7 * 5 + 1, 7, BAR_BELOW);
+         digit (o.value[q] - '0', BAR_BELOW);
          if (q == 5)
             guard (5);
       }
-      digit (value[q] - '0', 0);
+      digit (o.value[q] - '0', 0);
       guard (3);
-      chars (value + q, 1, 0, 6, 5, BAR_BELOW);
       bar (right, BAR_QUIET);
+      chars (o.value + q, 1, 0, 6, 5, BAR_BELOW | BAR_RIGHT);   // Right of quiet (as per GS-1 spec)
    } else if (l == 13)
    {                            // EAN-13
       const int leftswap[] = { 0, 0x34, 0x2c, 0x1c, 0x32, 0x26, 0x0e, 0x2a, 0x1a, 0x16 };
-      reverse = leftswap[value[0] - '0'];
+      reverse = leftswap[o.value[0] - '0'];
+      chars (o.value, 1, 0, 8, 7, BAR_BELOW | BAR_LEFT);        // Left of quiet (as per GS-1 spec)
       bar (left, BAR_QUIET);
-      chars (value, 1, -8, 8, 7, BAR_BELOW);
       guard (3);
       for (q = 1; q < l; q++)
       {
          if (q == 1 || q == 7)
-            chars (value + q, 6, 0, 6 * 7 + 1, 7, BAR_BELOW);
-         digit (value[q] - '0', BAR_BELOW);
+            chars (o.value + q, 6, 0, 6 * 7 + 1, 7, BAR_BELOW);
+         digit (o.value[q] - '0', BAR_BELOW);
          if (q == 6)
             guard (5);
       }
       guard (3);
-      if (!a)
-         chars (">", 1, 0, 8, 7, BAR_BELOW);
       bar (right, BAR_QUIET);
+      if (!a)
+         chars (">", 1, 0, 8, 7, BAR_BELOW | BAR_RIGHT);        // Right of quiet (as per GS-1 spec)
    }
    if (a)
    {                            // Add-on
@@ -444,7 +441,7 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
       bar (2, BAR_GUARD | BAR_ABOVE);
       for (q = 0; q < al; q++)
       {
-         chars (a + q, 1, 0, 9, 7, BAR_ABOVE);
+         chars (a + q, 1, 0, 9, 7, BAR_ABOVE | BAR_LEFT);
          digit (a[q] - '0', BAR_ABOVE);
          if (q + 1 < al)
          {
@@ -452,37 +449,55 @@ barcodeean (void *data, baradd_t * baradd, barchar_t * barchar, const char *valu
             bar (1, BAR_GUARD | BAR_ABOVE);
          }
       }
-      // bar (5, BAR_QUIET); // GS-1 spec, but silly
-      chars (">", 1, 0, 7, 7, BAR_ABOVE);
+      //bar (5, BAR_QUIET); // GS-1 spec - silly
       bar (7, BAR_QUIET);
+      chars (">", 1, 0, 7, 7, BAR_ABOVE | BAR_RIGHT);
    }
-   return total;
 }
 
-int
-barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, const char *value)
+void
+barcodetelepen_opts (barcode_t o)
 {
-   int flag = 0,
-      total = 0;
+   if (!o.thin)
+      o.thin = 1;
+   if (!o.thick)
+      o.thick = o.thin * 3;
+   if (o.numeric)
+   {
+      int l = 0;
+      for (const char *c = o.value; *c; c++)
+         if (isdigit (*c))
+            l++;
+      char buf[(l + 1) / 2];
+      l = 0;
+      for (const char *c = o.value; *c; c++)
+         if (isdigit (*c))
+         {
+            if (l & 1)
+               buf[l / 2] = 27 + (buf[l / 2] - 17) * 10 + *c - '0';
+            else
+               buf[l / 2] = 17 + *c - '0';
+            l++;
+         }
+   }
+   int flag = 0;
    void bar (int width, int flags)
    {
-      if (!barchar)
+      if (!o.barchar)
          flags &= ~(BAR_BELOW + BAR_ABOVE);
       if (flags & BAR_QUIET)
          flag &= ~BAR_BLACK;
-      if (baradd)
-         total += baradd (data, width, flags | flag);
-      else
-         total += width;
+      if (o.baradd)
+         o.baradd (o.data, width, flags | flag);
       flag ^= BAR_BLACK;
    }
-   void chars (const char *txt, int n, int dx, int w, int h, int flags)
+   void chars (const char *txt, int n, int dx, int w, int cw, int flags)
    {
-      if (barchar)
-         barchar (data, txt, n, dx, w, h, flags);
+      if (o.barchar)
+         o.barchar (o.data, txt, n, dx, w, cw, flags);
    }
    // Compose bits
-   unsigned char bits[len + 3];
+   unsigned char bits[o.len + 3];
    int q = 0;
    void add (unsigned char c)
    {
@@ -494,10 +509,10 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
    }
    add ('_');
    int csum = 0;
-   for (int i = 0; i < len; i++)
+   for (int i = 0; i < o.len; i++)
    {
-      add (value[i]);
-      csum += (value[i] & 0x7F);
+      add (o.value[i]);
+      csum += (o.value[i] & 0x7F);
    }
    csum = 127 - (csum % 127);
    if (csum == 127)
@@ -505,17 +520,17 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
    add (csum);
    add ('z');
    // Make barcode
-   bar (8, BAR_QUIET);          // Assuming 8 is sensible
+   bar (o.thin * 8, BAR_QUIET); // Assuming 8 is sensible
    int n = q * 8;
-   chars (value, len, 0, n*2, 7, BAR_BELOW);
+   chars (o.value, o.len, 0, n * 2, 7, BAR_BELOW);
    q = 0;
    while (q < n)
    {
       if (bits[q / 8] & (1 << (q & 7)))
       {                         // 1
-         bar (1, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
          if (q + 1 < n)
-            bar (1, BAR_DATA | BAR_BELOW);
+            bar (o.thin, BAR_DATA | BAR_BELOW);
          q++;
          continue;
       }
@@ -523,8 +538,8 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
       q++;
       if (!(bits[q / 8] & (1 << (q & 7))))
       {                         // 00
-         bar (3, BAR_DATA | BAR_BELOW);
-         bar (1, BAR_DATA | BAR_BELOW);
+         bar (o.thick, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
          q++;
          continue;
       }
@@ -532,50 +547,27 @@ barcodetelepen (void *data, baradd_t * baradd, barchar_t * barchar, int len, con
       // 01
       if (!(bits[q / 8] & (1 << (q & 7))))
       {                         // 010
-         bar (3, BAR_DATA | BAR_BELOW);
-         bar (3, BAR_DATA | BAR_BELOW);
+         bar (o.thick, BAR_DATA | BAR_BELOW);
+         bar (o.thick, BAR_DATA | BAR_BELOW);
          q++;
          continue;
       }
       q++;
       // 011
-      bar (1, BAR_DATA | BAR_BELOW);    // Start run
-      bar (3, BAR_DATA | BAR_BELOW);
+      bar (o.thin, BAR_DATA | BAR_BELOW);       // Start run
+      bar (o.thick, BAR_DATA | BAR_BELOW);
       while (q < n && bits[q / 8] & (1 << (q & 7)))
       {                         // 1
-         bar (1, BAR_DATA | BAR_BELOW);
-         bar (1, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
+         bar (o.thin, BAR_DATA | BAR_BELOW);
          q++;
       }
       // 10
       q++;
-      bar (1, BAR_DATA | BAR_BELOW);    // End run
-      bar (3, BAR_DATA | BAR_BELOW);
+      bar (o.thin, BAR_DATA | BAR_BELOW);       // End run
+      bar (o.thick, BAR_DATA | BAR_BELOW);
    }
-   bar (8, BAR_QUIET);          // Assuming 8 is sensible
-   return total;
-}
-
-int
-barcodetelepennumeric (void *data, baradd_t * baradd, barchar_t * barchar, const char *value)
-{
-   int l = 0;
-   for (const char *c = value; *c; c++)
-      if (isdigit (*c))
-         l++;
-   char buf[(l + 1) / 2];
-   l = 0;
-   for (const char *c = value; *c; c++)
-      if (isdigit (*c))
-      {
-         if (l & 1)
-            buf[l / 2] = 27 + (buf[l / 2] - 17) * 10 + *c - '0';
-         else
-            buf[l / 2] = 17 + *c - '0';
-         l++;
-      }
-   return barcodetelepen (data, baradd, barchar, (l + 1) / 2, buf);
-
+   bar (o.thin * 8, BAR_QUIET); // Assuming 8 is sensible
 }
 
 #ifndef LIB
@@ -729,7 +721,7 @@ main (int argc, const char *argv[])
       char *d;
       size_t dlen;
       FILE *path = open_memstream (&d, &dlen);
-      int baradd (void *ptr, int n, int flags)
+      void baradd (void *ptr, int n, int flags)
       {
          if (flags & BAR_BLACK)
          {
@@ -764,7 +756,6 @@ main (int argc, const char *argv[])
             fprintf (path, "M%d %.2fh%dv%.2fh%dz", w, t / unitsize, n, l / unitsize, -n);
          }
          w += n;
-         return n;
       }
       void barchar (void *ptr, const char *txt, int c, int dx, int n, int cw, int flags)
       {
@@ -790,21 +781,23 @@ main (int argc, const char *argv[])
             u = 2;              // Double units to allow 2.5:1 ITF
          w += left * u;
          if (len == 14)
-            barcodeitf (NULL, &baradd, NULL, code, u, u * 5 / 2);       // GTIN-14 packaging label
+          barcodeitf (code, baradd: &baradd, thin:u);
+         // GTIN-14 packaging label
          else
-            barcodeean (NULL, &baradd, &barchar, code); // EAN/UPC/GTIN product label
+          barcodeean (code, baradd: &baradd, barchar:&barchar);
+         // EAN/UPC/GTIN product label
          w += right * u;
       }
       if (format == 'i')
-         barcodeitf (NULL, &baradd, &barchar, code, 2, 5);
+       barcodeitf (code, baradd: &baradd, barchar:&barchar);
       if (format == '3')
-         barcode39 (NULL, &baradd, &barchar, code, 2, 5);
+       barcode39 (code, baradd: &baradd, barchar:&barchar);
       if (format == 'c')
-         barcode128 (NULL, &baradd, &barchar, code);
+       barcode128 (code, baradd: &baradd, barchar:&barchar);
       if (format == 't')
-         barcodetelepen (NULL, &baradd, &barchar, strlen (code), code);
+       barcodetelepen (code, baradd: &baradd, barchar: &barchar, len:strlen (code));
       if (format == 'n')
-         barcodetelepennumeric (NULL, &baradd, &barchar, code);
+       barcodetelepen (code, baradd: &baradd, barchar: &barchar, numeric:1);
       fclose (path);
       if (len == 14)
       {                         // GTIN-14
