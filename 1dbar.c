@@ -588,6 +588,7 @@ main (int argc, const char *argv[])
    int border = 4;              // GTIN-4 border
    int left = -1;               // Left extra border
    int right = -1;              // Right extra border
+   int invert = 0;              // Invert
    double unitsize = -1;        // mm size of units
    double unitdpi = -1;         // dpi size to set mm size of units
    const char *font = "OCRB,OCR-B,sans-serif";
@@ -618,6 +619,7 @@ main (int argc, const char *argv[])
          {"right", 0, POPT_ARG_INT, &right, 0, "Right quiet zone", "units"},
          {"bleed", 'b', POPT_ARG_INT, &bleed, 0, "Allow print bleed", "% of bar"},
          {"code", 'c', POPT_ARG_STRING, &font, 0, "Code", "code"},
+         {"invert", 0, POPT_ARG_NONE, &invert, 0, "Invert"},
          {"kicad", 0, POPT_ARG_NONE, &kicad, 0, "KiCad module"},
          {"kicad-font", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &kicadfont, 0, "KiCad font", "font"},
          {"kicad-layer", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &kicadlayer, 0, "KiCad layer", "layer"},
@@ -647,6 +649,8 @@ main (int argc, const char *argv[])
       unitsize = 25.4 / unitdpi;
    if (!fontadjust)
       fontadjust = kicad ? 0.75 : 1.2;
+   if (kicad)
+      invert ^= 1;
 
    int len = strlen (code);
    // Some defaults
@@ -738,7 +742,7 @@ main (int argc, const char *argv[])
    FILE *path = open_memstream (&d, &dlen);
    void baradd (void *ptr, int n, int flags)
    {
-      if (kicad ? (!(flags & BAR_BLACK)) : (flags & BAR_BLACK))
+      if (invert ? (!(flags & BAR_BLACK)) : (flags & BAR_BLACK))
       {
          q++;
          double l = h * u,
