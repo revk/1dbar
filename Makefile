@@ -1,7 +1,7 @@
 all: 1dbar.o 1dbar
 
 1dbar: 1dbar.c AXL/axl.o 1dbar.h
-	cc -O -o $@ $< -lpopt -IAXL -I. -D_GNU_SOURCE AXL/axl.o -lcurl --std=gnu99
+	cc -O -g -o $@ $< -lpopt -IAXL -I. -D_GNU_SOURCE AXL/axl.o -lcurl --std=gnu99
 
 1dbar.o: 1dbar.c AXL/axl.o 1dbar.h
 	cc -g -Wall -Wextra -DLIB -O -c -o 1dbar.o 1dbar.c -I. -IAXL -D_GNU_SOURCE --std=gnu99

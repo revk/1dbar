@@ -8,6 +8,7 @@
 #include <axl.h>
 #include <err.h>
 #include <stdio.h>
+#include <malloc.h>
 #include "1dbar.h"
 
 // https://www.gs1.org/docs/barcodes/GS1_General_Specifications.pdf
@@ -582,7 +583,7 @@ main (int argc, const char *argv[])
    double h = -1;               // height
    double whiteborder = 0;      // Extra white border
    double fh = -1;              // font height
-   double fontadjust = 1.2;     // font size increase
+   double fontadjust = 0;       // font size increase
    int bleed = 0;               // Edge white for over printing black bleed
    int border = 4;              // GTIN-4 border
    int left = -1;               // Left extra border
@@ -590,8 +591,12 @@ main (int argc, const char *argv[])
    double unitsize = -1;        // mm size of units
    double unitdpi = -1;         // dpi size to set mm size of units
    const char *font = "OCRB,OCR-B,sans-serif";
+   int kicad = 0;
+   const char *kicadfont = "OCR-B";
+   const char *kicadlayer = "F.Cu";
+   char *code = NULL;
+   poptContext optCon;          // context for parsing command-line options
    {                            // POPT
-      poptContext optCon;       // context for parsing command-line options
       const struct poptOption optionsTable[] = {
          {"gtin", 'g', POPT_ARG_VAL, &format, 'g', "GTIN"},
          {"ean", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &format, 'g', "EAN"},
@@ -601,7 +606,6 @@ main (int argc, const char *argv[])
          {"c128", 0, POPT_ARG_VAL, &format, 'c', "Codebar 128"},
          {"telepen", 0, POPT_ARG_VAL, &format, 't', "Telepen"},
          {"telepen-numeric", 0, POPT_ARG_VAL, &format, 'n', "Telepen"},
-         {"codabar", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &format, 'c', "Codebar 128"},
          {"mm", 's', POPT_ARG_DOUBLE, &unitsize, 0, "Unit size", "mm"},
          {"dpi", 'd', POPT_ARG_DOUBLE, &unitdpi, 0, "Unit dpi", "dpi"},
          {"unit-size", 0, POPT_ARGFLAG_DOC_HIDDEN | POPT_ARG_DOUBLE, &unitsize, 0, "Unit size", "mm"},
@@ -613,6 +617,10 @@ main (int argc, const char *argv[])
          {"left", 0, POPT_ARG_INT, &left, 0, "Left quiet zone", "units"},
          {"right", 0, POPT_ARG_INT, &right, 0, "Right quiet zone", "units"},
          {"bleed", 'b', POPT_ARG_INT, &bleed, 0, "Allow print bleed", "% of bar"},
+         {"code", 'c', POPT_ARG_STRING, &font, 0, "Code", "code"},
+         {"kicad", 0, POPT_ARG_NONE, &kicad, 0, "KiCad module"},
+         {"kicad-font", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &kicadfont, 0, "KiCad font", "font"},
+         {"kicad-layer", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &kicadlayer, 0, "KiCad layer", "layer"},
          {"debug", 'v', POPT_ARG_NONE, &debug, 0, "Debug"},
          POPT_AUTOHELP {}
       };
@@ -624,235 +632,289 @@ main (int argc, const char *argv[])
       if ((c = poptGetNextOpt (optCon)) < -1)
          errx (1, "%s: %s\n", poptBadOption (optCon, POPT_BADOPTION_NOALIAS), poptStrerror (c));
 
-      if (!poptPeekArg (optCon) || !format)
+      if (poptPeekArg (optCon) && !code)
+         code = (char *) poptGetArg (optCon);
+
+      if (poptPeekArg (optCon) || !format || !code)
       {
          poptPrintUsage (optCon, stderr, 0);
          return -1;
       }
-      if (unitdpi >= 0 && unitsize >= 0)
-         errx (1, "--dpi or --mm");
-      if (unitdpi > 0)
-         unitsize = 25.4 / unitdpi;
-      char *code = strdupa (poptGetArg (optCon));
-      int len = strlen (code);
-      // Some defaults
-      if (format == 'g')
-      {                         // GTIN / EAN / UPC
-         for (len = 0; code[len] && isdigit (code[len]); len++);        // Allow for add-ons
-         if (len == 14)
-         {                      // GTIN-14 (ITF)
-            if (left < 0)
-               left = border / 2;
-            if (right < 0)
-               right = border / 2;
-            if (unitsize < 0)
-               unitsize = 0.635;        // 25 mil
-            if (fh < 0)
-               fh = 5;
-            if (h < 0)
-               h = 31.75 + border + fh / unitsize;      // 1.25 (height of bars)
-         } else
-         {                      // Normal EAN/UPC/GTIN
-            if (h < 0)
-            {                   // Default height
-               if (len == 13)
-                  h = 25.93;
-               else if (len == 12)
-                  h = 25.93;
-               else if (len == 8)
-                  h = 21.31;
-               else if (len == 7)
-                  h = 25.93;
-            }
-         }
-      }
-      if (unitsize < 0)
-         unitsize = 0.33;
-      if (fh < 0)
-         fh = unitsize * 28 / 3;
-      if (h < 0)
-         h = 20;
-      if (left < 0)
-         left = 0;
-      if (right < 0)
-         right = 0;
-      // Check digit
-      if (format == 'g')
-      {
-         int m = ((len & 1) ? 1 : 3),
-            p,
-            t = 0;
-         for (p = 0; p < len - 1; p++)
-         {
-            t += m * (code[p] - '0');
-            m = 4 - m;
-         }
-         t %= 10;
-         t = 10 - t;
-         t %= 10;
-         code[p] = '0' + t;
-      }
-
-      if (format == 'g' && len == 12 && code[0] == '0')
-      {                         // Consider reducing to UPC-E
-         if (code[10] >= '5' && code[10] <= '9' && code[6] == '0' && code[7] == '0' && code[8] == '0' && code[9] == '0' && code[5] != '0')
-            len = asprintf (&code, "%.5s%c%c", code + 1, code[10], code[11]);
-         else if (code[5] == '0' && code[6] == '0' && code[7] == '0' && code[8] == '0' && code[9] == '0' && code[4] != '0')
-            len = asprintf (&code, "%.4s%c4%c", code + 1, code[10], code[11]);
-         else if (code[3] >= '0' && code[3] <= '2' && code[4] == '0' && code[5] == '0' && code[6] == '0' && code[7] == '0')
-            len = asprintf (&code, "%.2s%.3s%c%c", code + 1, code + 8, code[3], code[11]);
-         else if (code[3] >= '3' && code[3] <= '9' && code[4] == '0' && code[5] == '0' && code[6] == '0' && code[7] == '0' && code[8] == '0')
-            len = asprintf (&code, "%.3s%.2s3%c", code + 1, code + 9, code[11]);
-      }
-
-      int w = 0;
-      int u = 1;
-      int q = 0;
-      if ((format == 'g' && len == 14) || format == 'i' || format == '3')
-         u = 2;
-      xml_t root = xml_tree_new ("svg");
-      xml_t rect = xml_element_add (root, "rect");
-      xml_t text = NULL;
-      if (fh > 0)
-      {
-         text = xml_element_add (root, "g");
-         xml_add (text, "@font-family", font);
-         xml_addf (text, "@font-size", "%.2f", fontadjust * fh * u / unitsize);
-      }
-      char *d;
-      size_t dlen;
-      FILE *path = open_memstream (&d, &dlen);
-      void baradd (void *ptr, int n, int flags)
-      {
-         if (flags & BAR_BLACK)
-         {
-            q++;
-            double l = h * u,
-               t = 0;
-            if (fh > 0)
-            {
-               if (flags & BAR_ABOVE)
-               {
-#if 0
-                  // Note, the GS1 spec has add on 21.9mm high for UPC-A and EAN-13 which is clearly a mistake, and also allows far to little space for digits
-
-                  t += fh * u * 0.844;  // space for digits above
-                  if (len == 12)
-                     l -= fh * u * 1.844;
-                  else
-                     l -= fh * u * 1.308;
-#else
-                  // This is more logical, allows space for digits
-                  t += fh * u * 1;      // Allow space
-                  if (len == 12)
-                     l -= fh * u * 2;
-                  else
-                     l -= fh * u * 1.464;
-#endif
-               } else if ((flags & BAR_BELOW) || len == 14)
-                  l -= fh * u;  // space for digits below
-               else
-                  l -= fh * u * 0.464;  // shorted bars anyway when digits apply
-            }
-            fprintf (path, "M%d %.2fh%dv%.2fh%dz", w, t / unitsize, n, l / unitsize, -n);
-         }
-         w += n;
-      }
-      void barchar (void *ptr, const char *txt, int c, int dx, int n, int cw, int flags)
-      {
-         if (!text)
-            return;
-         xml_t t = xml_addf (text, "+text", "%.*s", c, txt);
-         if (cw < 7)
-            xml_addf (t, "@font-size", "%.2f", fontadjust * fh * u * cw / unitsize / 7);
-         if (flags & (BAR_RIGHT | BAR_LEFT))
-            xml_addf (t, "@x", "%d", (w + dx));
-         else
-            xml_addf (t, "@x", "%.1f", (double) (w + dx) + (double) n / 2);
-         if (flags & BAR_ABOVE)
-            xml_addf (t, "@y", "%.2f", fh * u * cw / unitsize * 0.92 / 7);
-         else
-            xml_addf (t, "@y", "%.2f", h * u / unitsize - 0.1);
-         if (!(flags & BAR_LEFT))
-            xml_addf (t, "@text-anchor", (flags & BAR_RIGHT) ? "end" : "middle");
-      }
-      if (format == 'g')
-      {
-         if (len == 14)
-            u = 2;              // Double units to allow 2.5:1 ITF
-         w += left * u;
-         if (len == 14)
-          barcodeitf (code, baradd: &baradd, thin:u);
-         // GTIN-14 packaging label
-         else
-          barcodeean (code, baradd: &baradd, barchar:&barchar);
-         // EAN/UPC/GTIN product label
-         w += right * u;
-      }
-      if (format == 'i')
-       barcodeitf (code, baradd: &baradd, barchar:&barchar);
-      if (format == '3')
-       barcode39 (code, baradd: &baradd, barchar:&barchar);
-      if (format == 'c')
-       barcode128 (code, baradd: &baradd, barchar:&barchar);
-      if (format == 't')
-       barcodetelepen (code, baradd: &baradd, barchar: &barchar, len:strlen (code));
-      if (format == 'n')
-       barcodetelepen (code, baradd: &baradd, barchar: &barchar, numeric:1);
-      fclose (path);
-      if (len == 14)
-      {                         // GTIN-14
-         xml_t t = xml_addf (text, "+text", "%.1s %.2s %.5s %.5s %.1s", code + 0, code + 1, code + 3, code + 8, code + 13);
-         xml_addf (t, "@textLength", "%d", 14 * (5 + 5 + 2 + 2 + 2));
-         xml_addf (t, "@x", "%d", border * u + 10 * u + 4 * u);
-         xml_addf (t, "@y", "%.2f", h * u / unitsize);
-      }
-      xml_element_set_namespace (root, xml_namespace (root, NULL, "http://www.w3.org/2000/svg"));
-      xml_namespace (root, "^xlink", "http://www.w3.org/1999/xlink");
-      root->tree->encoding = NULL;
-      xml_t p = xml_element_add (root, "path");
-      xml_add (p, "@d", d);
-      xml_add (p, "@fill", "black");
-      if (bleed)
-      {
-         xml_addf (p, "@stroke-width", "%.2f", (double) bleed * u / 100);
-         xml_add (p, "@stroke", "white");
-      } else
-         xml_add (p, "@stroke", "none");
-      if (unitsize >= 0)
-      {
-         xml_addf (root, "@viewBox", "0 0 %d %.2f", w, h * u / unitsize);
-         xml_addf (root, "@width", "%.2fmm", unitsize * w / u);
-         xml_addf (root, "@height", "%.2fmm", h);
-      } else
-      {
-         xml_addf (root, "@width", "%d", w);
-         xml_addf (root, "@height", "%d", h * u / unitsize);
-      }
-      xml_addf (rect, "@width", "%d", w);
-      xml_addf (rect, "@height", "%.2f", h * u / unitsize);
-      xml_add (rect, "@fill", "white");
-      if (whiteborder)
-      {
-         xml_add (rect, "@stroke", "white");
-         xml_addf (rect, "@stroke-width", "%.2f", whiteborder * 2 * u / unitsize);
-      } else
-         xml_add (rect, "@stroke", "none");
-      if (format == 'g' && len == 14)
-      {
-         rect = xml_element_add (root, "rect");
-         xml_addf (rect, "@x", "%d", border * u / 2);
-         xml_addf (rect, "@y", "%d", border * u / 2);
-         xml_addf (rect, "@width", "%d", w - border * u);
-         xml_addf (rect, "@height", "%.2f", h / unitsize * u - border * u - fh * u / unitsize);
-         xml_add (rect, "@fill", "none");
-         xml_add (rect, "@stroke", "black");
-         xml_addf (rect, "@stroke-width", "%d", border * u);
-      }
-      xml_write (stdout, root);
-      xml_tree_delete (root);
-      poptFreeContext (optCon);
    }
+   if (unitdpi >= 0 && unitsize >= 0)
+      errx (1, "--dpi or --mm");
+   if (unitdpi > 0)
+      unitsize = 25.4 / unitdpi;
+   if (!fontadjust)
+      fontadjust = kicad ? 0.75 : 1.2;
+
+   int len = strlen (code);
+   // Some defaults
+   if (format == 'g')
+   {                            // GTIN / EAN / UPC
+      for (len = 0; code[len] && isdigit (code[len]); len++);   // Allow for add-ons
+      if (len == 14)
+      {                         // GTIN-14 (ITF)
+         if (left < 0)
+            left = border / 2;
+         if (right < 0)
+            right = border / 2;
+         if (unitsize < 0)
+            unitsize = 0.635;   // 25 mil
+         if (fh < 0)
+            fh = 5;
+         if (h < 0)
+            h = 31.75 + border + fh / unitsize; // 1.25 (height of bars)
+      } else
+      {                         // Normal EAN/UPC/GTIN
+         if (h < 0)
+         {                      // Default height
+            if (len == 13)
+               h = 25.93;
+            else if (len == 12)
+               h = 25.93;
+            else if (len == 8)
+               h = 21.31;
+            else if (len == 7)
+               h = 25.93;
+         }
+      }
+   }
+   if (unitsize < 0)
+      unitsize = 0.33;
+   if (fh < 0)
+      fh = unitsize * 28 / 3;
+   if (h < 0)
+      h = 20;
+   if (left < 0)
+      left = 0;
+   if (right < 0)
+      right = 0;
+   // Check digit
+   if (format == 'g')
+   {
+      int m = ((len & 1) ? 1 : 3),
+         p,
+         t = 0;
+      for (p = 0; p < len - 1; p++)
+      {
+         t += m * (code[p] - '0');
+         m = 4 - m;
+      }
+      t %= 10;
+      t = 10 - t;
+      t %= 10;
+      code[p] = '0' + t;
+   }
+
+   if (format == 'g' && len == 12 && code[0] == '0')
+   {                            // Consider reducing to UPC-E
+      if (code[10] >= '5' && code[10] <= '9' && code[6] == '0' && code[7] == '0' && code[8] == '0' && code[9] == '0' && code[5] != '0')
+         len = asprintf (&code, "%.5s%c%c", code + 1, code[10], code[11]);
+      else if (code[5] == '0' && code[6] == '0' && code[7] == '0' && code[8] == '0' && code[9] == '0' && code[4] != '0')
+         len = asprintf (&code, "%.4s%c4%c", code + 1, code[10], code[11]);
+      else if (code[3] >= '0' && code[3] <= '2' && code[4] == '0' && code[5] == '0' && code[6] == '0' && code[7] == '0')
+         len = asprintf (&code, "%.2s%.3s%c%c", code + 1, code + 8, code[3], code[11]);
+      else if (code[3] >= '3' && code[3] <= '9' && code[4] == '0' && code[5] == '0' && code[6] == '0' && code[7] == '0' && code[8] == '0')
+         len = asprintf (&code, "%.3s%.2s3%c", code + 1, code + 9, code[11]);
+   }
+
+   int w = 0;
+   int u = 1;
+   int q = 0;
+   if ((format == 'g' && len == 14) || format == 'i' || format == '3')
+      u = 2;
+   xml_t root = xml_tree_new ("svg");
+   xml_t rect = xml_element_add (root, "rect");
+   xml_t text = NULL;
+   if (fh > 0)
+   {
+      text = xml_element_add (root, "g");
+      xml_add (text, "@font-family", font);
+      xml_addf (text, "@font-size", "%.2f", fontadjust * fh * u / unitsize);
+   }
+   char *d;
+   size_t dlen;
+   FILE *path = open_memstream (&d, &dlen);
+   void baradd (void *ptr, int n, int flags)
+   {
+      if (flags & BAR_BLACK)
+      {
+         q++;
+         double l = h * u,
+            t = 0;
+         if (fh > 0)
+         {
+            if (flags & BAR_ABOVE)
+            {
+#if 0
+               // Note, the GS1 spec has add on 21.9mm high for UPC-A and EAN-13 which is clearly a mistake, and also allows far to little space for digits
+
+               t += fh * u * 0.844;     // space for digits above
+               if (len == 12)
+                  l -= fh * u * 1.844;
+               else
+                  l -= fh * u * 1.308;
+#else
+               // This is more logical, allows space for digits
+               t += fh * u * 1; // Allow space
+               if (len == 12)
+                  l -= fh * u * 2;
+               else
+                  l -= fh * u * 1.464;
+#endif
+            } else if ((flags & BAR_BELOW) || len == 14)
+               l -= fh * u;     // space for digits below
+            else
+               l -= fh * u * 0.464;     // shorted bars anyway when digits apply
+         }
+         if (kicad)
+            fprintf (path, "(fp_rect (start %.2f %.2f) (end %.2f %.2f)(stroke (width 0) (type solid)) (fill solid) (layer %s))\n", (double) w * unitsize / u, (double) t / u, (double) (w + n) * unitsize / u, (double) (t + l) / u, kicadlayer);
+         else
+            fprintf (path, "M%d %.2fh%dv%.2fh%dz", w, t / unitsize, n, l / unitsize, -n);
+      }
+      w += n;
+   }
+   void barchar (void *ptr, const char *txt, int c, int dx, int n, int cw, int flags)
+   {
+      if (!text)
+         return;
+      if (kicad)
+      {
+         double X = (flags & (BAR_RIGHT | BAR_LEFT)) ? (w + dx) : (double) (w + dx) + (double) n / 2;
+         double Y = (flags & BAR_ABOVE) ? fh * u * cw / unitsize * 0.92 / 7 : h * u / unitsize - 0.1;
+         double S = (cw < 7) ? fontadjust * fh * cw / 7 : fontadjust * fh;
+         // Adjust to kicad units
+         X = X * unitsize / u;
+         Y = Y * unitsize / u;
+         fprintf (path, "(fp_text user \"%.*s\" (at %.2f %.2f) (layer %s) (effects (font ", c, txt, X, Y, kicadlayer);
+         if (*kicadfont)
+            fprintf (path, "(face \"%s\") ", kicadfont);
+         fprintf (path, "(size %.2f %.2f) (thickness 0.1)) (justify ", S, S);
+         if (flags & BAR_LEFT)
+            fprintf (path, "left ");
+         else if (flags & BAR_RIGHT)
+            fprintf (path, "right ");
+         fprintf (path, "bottom)))\n");
+         return;
+      }
+      xml_t t = xml_addf (text, "+text", "%.*s", c, txt);
+      if (cw < 7)
+         xml_addf (t, "@font-size", "%.2f", fontadjust * fh * u * cw / unitsize / 7);
+      if (flags & (BAR_RIGHT | BAR_LEFT))
+         xml_addf (t, "@x", "%d", (w + dx));
+      else
+         xml_addf (t, "@x", "%.1f", (double) (w + dx) + (double) n / 2);
+      if (flags & BAR_ABOVE)
+         xml_addf (t, "@y", "%.2f", fh * u * cw / unitsize * 0.92 / 7);
+      else
+         xml_addf (t, "@y", "%.2f", h * u / unitsize - 0.1);
+      if (!(flags & BAR_LEFT))
+         xml_addf (t, "@text-anchor", (flags & BAR_RIGHT) ? "end" : "middle");
+   }
+   if (kicad)
+   {
+      fprintf (path, "(module Barcode (layer %s)\n", kicadlayer);
+      fprintf (path, "(attr exclude_from_pos_files exclude_from_bom allow_soldermask_bridges)\n");
+      fprintf (path, "(fp_text reference REF** (at 0 -3) (layer F.SilkS) hide (effects (font (size 1 1) (thickness 0.15)) (justify left)))\n");
+      fprintf (path, "(fp_text value %s (at 0 -1) (layer F.Fab) hide (effects (font (size 1 1) (thickness 0.15)) (justify left)))\n", code);
+   }
+   if (format == 'g')
+   {
+      if (len == 14)
+         u = 2;                 // Double units to allow 2.5:1 ITF
+      w += left * u;
+      if (len == 14)
+       barcodeitf (code, baradd: &baradd, thin:u);
+      // GTIN-14 packaging label
+      else
+       barcodeean (code, baradd: &baradd, barchar:&barchar);
+      // EAN/UPC/GTIN product label
+      w += right * u;
+   }
+   if (format == 'i')
+    barcodeitf (code, baradd: &baradd, barchar:&barchar);
+   if (format == '3')
+    barcode39 (code, baradd: &baradd, barchar:&barchar);
+   if (format == 'c')
+    barcode128 (code, baradd: &baradd, barchar:&barchar);
+   if (format == 't')
+    barcodetelepen (code, baradd: &baradd, barchar: &barchar, len:strlen (code));
+   if (format == 'n')
+    barcodetelepen (code, baradd: &baradd, barchar: &barchar, numeric:1);
+   if (kicad)
+   {
+      if (strstr (kicadlayer, "Cu"))
+      {
+	      double l=(double)-border,r=(double)w*unitsize/u+border,t=(double)h+ border,b=(double)-border;
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", l,b,l,t);
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", l,t,r,t);
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", r,t,r,b);
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", r,b,l,b);
+         fprintf (path, "(fp_poly (pts (xy %f %f) (xy %f %f) (xy %f %f) (xy %f %f)) (layer F.Mask) (width 0))\n",l,b,l,t,r,t,r,b);
+         fprintf (path, "(zone (net 0) (net_name \"\") (layer \"F.Cu\") (hatch edge 0.508)\n" "(connect_pads (clearance 0))\n"
+                  "(min_thickness 0.254)\n"
+                  "(keepout (tracks not_allowed) (vias not_allowed) (copperpour not_allowed) (footprints not_allowed))\n" "(fill (thermal_gap 0.508) (thermal_bridge_width 0.508))\n" "(polygon (pts (xy %f %f) (xy %f %f) (xy %f %f) (xy %f %f))))\n", l,b,l,t,r,t,r,b);
+      }
+      fprintf (path, ")\n");
+   }
+   fclose (path);
+   if (len == 14)
+   {                            // GTIN-14
+      xml_t t = xml_addf (text, "+text", "%.1s %.2s %.5s %.5s %.1s", code + 0, code + 1, code + 3, code + 8, code + 13);
+      xml_addf (t, "@textLength", "%d", 14 * (5 + 5 + 2 + 2 + 2));
+      xml_addf (t, "@x", "%d", border * u + 10 * u + 4 * u);
+      xml_addf (t, "@y", "%.2f", h * u / unitsize);
+   }
+   xml_element_set_namespace (root, xml_namespace (root, NULL, "http://www.w3.org/2000/svg"));
+   xml_namespace (root, "^xlink", "http://www.w3.org/1999/xlink");
+   root->tree->encoding = NULL;
+   xml_t p = xml_element_add (root, "path");
+   xml_add (p, "@d", d);
+   xml_add (p, "@fill", "black");
+   if (bleed)
+   {
+      xml_addf (p, "@stroke-width", "%.2f", (double) bleed * u / 100);
+      xml_add (p, "@stroke", "white");
+   } else
+      xml_add (p, "@stroke", "none");
+   if (unitsize >= 0)
+   {
+      xml_addf (root, "@viewBox", "0 0 %d %.2f", w, h * u / unitsize);
+      xml_addf (root, "@width", "%.2fmm", unitsize * w / u);
+      xml_addf (root, "@height", "%.2fmm", h);
+   } else
+   {
+      xml_addf (root, "@width", "%d", w);
+      xml_addf (root, "@height", "%d", h * u / unitsize);
+   }
+   xml_addf (rect, "@width", "%d", w);
+   xml_addf (rect, "@height", "%.2f", h * u / unitsize);
+   xml_add (rect, "@fill", "white");
+   if (whiteborder)
+   {
+      xml_add (rect, "@stroke", "white");
+      xml_addf (rect, "@stroke-width", "%.2f", whiteborder * 2 * u / unitsize);
+   } else
+      xml_add (rect, "@stroke", "none");
+   if (format == 'g' && len == 14)
+   {
+      rect = xml_element_add (root, "rect");
+      xml_addf (rect, "@x", "%d", border * u / 2);
+      xml_addf (rect, "@y", "%d", border * u / 2);
+      xml_addf (rect, "@width", "%d", w - border * u);
+      xml_addf (rect, "@height", "%.2f", h / unitsize * u - border * u - fh * u / unitsize);
+      xml_add (rect, "@fill", "none");
+      xml_add (rect, "@stroke", "black");
+      xml_addf (rect, "@stroke-width", "%d", border * u);
+   }
+   if (kicad)
+      printf ("%s", d);         // Kicad is all in path
+   else
+      xml_write (stdout, root);
+   free (d);
+   xml_tree_delete (root);
+   poptFreeContext (optCon);
    return 0;
 }
 #endif
