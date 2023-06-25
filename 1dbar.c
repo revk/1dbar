@@ -359,18 +359,18 @@ barcodeean_opts (barcode_t o)
       const int cs[] = { 0x07, 0x0b, 0x13, 0x23, 0x0d, 0x19, 0x31, 0x15, 0x25, 0x29 };
       reverse = cs[o.value[l - 1] - '0'];
       chars ("0", 1, 0, 6, 5, BAR_BELOW | BAR_LEFT);    // Left of quiet (as per GS-1 spec)
-      bar (left, BAR_QUIET);
+      bar (left, BAR_QUIET | BAR_BELOW);
       guard (3);
       chars (o.value, 6, 0, 7 * 6 + 1, 7, BAR_BELOW);
       for (q = 0; q < 6; q++)
          digit (o.value[q] - '0', BAR_BELOW);
       guard (6);
-      bar (right, BAR_QUIET);
+      bar (right, BAR_QUIET | BAR_BELOW);
       chars (o.value + q, 1, 0, 6, 5, BAR_BELOW | BAR_RIGHT);   // Right of quiet (as per GS-1 spec)
    } else if (l == 8)
    {                            // EAN-8
       chars ("<", 1, 0, 8, 7, BAR_BELOW | BAR_LEFT);    // Left of quiet (as per GS-1 spec)
-      bar (left, BAR_QUIET);
+      bar (left, BAR_QUIET | BAR_BELOW);
       guard (3);
       for (q = 0; q < l; q++)
       {
@@ -381,13 +381,13 @@ barcodeean_opts (barcode_t o)
             guard (5);
       }
       guard (3);
-      bar (right, BAR_QUIET);
+      bar (right, BAR_QUIET | BAR_BELOW);
       if (!a)
          chars (">", 1, 0, 8, 7, BAR_BELOW | BAR_RIGHT);        // Right of quiet (as per GS-1 spec)
    } else if (l == 12)
    {                            // UPC-A
       chars (o.value, 1, 0, 6, 5, BAR_BELOW | BAR_LEFT);        // Left of quiet (as per GS-1 spec)
-      bar (left, BAR_QUIET);
+      bar (left, BAR_QUIET | BAR_BELOW);
       guard (3);
       digit (o.value[0] - '0', 0);
       for (q = 1; q < l - 1; q++)
@@ -400,14 +400,14 @@ barcodeean_opts (barcode_t o)
       }
       digit (o.value[q] - '0', 0);
       guard (3);
-      bar (right, BAR_QUIET);
+      bar (right, BAR_QUIET | BAR_BELOW);
       chars (o.value + q, 1, 0, 6, 5, BAR_BELOW | BAR_RIGHT);   // Right of quiet (as per GS-1 spec)
    } else if (l == 13)
    {                            // EAN-13
       const int leftswap[] = { 0, 0x34, 0x2c, 0x1c, 0x32, 0x26, 0x0e, 0x2a, 0x1a, 0x16 };
       reverse = leftswap[o.value[0] - '0'];
       chars (o.value, 1, 0, 8, 7, BAR_BELOW | BAR_LEFT);        // Left of quiet (as per GS-1 spec)
-      bar (left, BAR_QUIET);
+      bar (left, BAR_QUIET | BAR_BELOW);
       guard (3);
       for (q = 1; q < l; q++)
       {
@@ -418,7 +418,7 @@ barcodeean_opts (barcode_t o)
             guard (5);
       }
       guard (3);
-      bar (right, BAR_QUIET);
+      bar (right, BAR_QUIET | BAR_BELOW);
       if (!a)
          chars (">", 1, 0, 8, 7, BAR_BELOW | BAR_RIGHT);        // Right of quiet (as per GS-1 spec)
    }
@@ -451,8 +451,8 @@ barcodeean_opts (barcode_t o)
             bar (1, BAR_GUARD | BAR_ABOVE);
          }
       }
-      //bar (5, BAR_QUIET); // GS-1 spec - silly
-      bar (7, BAR_QUIET);
+      //bar (5, BAR_QUIET|BAR_BELOW); // GS-1 spec - silly
+      bar (7, BAR_QUIET | BAR_BELOW);
       chars (">", 1, 0, 7, 7, BAR_ABOVE | BAR_RIGHT);
    }
 }
@@ -738,7 +738,7 @@ main (int argc, const char *argv[])
    FILE *path = open_memstream (&d, &dlen);
    void baradd (void *ptr, int n, int flags)
    {
-      if (flags & BAR_BLACK)
+      if (kicad ? (!(flags & BAR_BLACK)) : (flags & BAR_BLACK))
       {
          q++;
          double l = h * u,
@@ -846,15 +846,17 @@ main (int argc, const char *argv[])
    {
       if (strstr (kicadlayer, "Cu"))
       {
-	      double l=(double)-border,r=(double)w*unitsize/u+border,t=(double)h+ border,b=(double)-border;
-         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", l,b,l,t);
-         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", l,t,r,t);
-         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", r,t,r,b);
-         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", r,b,l,b);
-         fprintf (path, "(fp_poly (pts (xy %f %f) (xy %f %f) (xy %f %f) (xy %f %f)) (layer F.Mask) (width 0))\n",l,b,l,t,r,t,r,b);
+         double l = (double) -border,
+         r = (double) w *unitsize / u + border,
+           t = (double) h + border,
+            b = (double) -border;
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", l, b, l, t);
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", l, t, r, t);
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", r, t, r, b);
+         fprintf (path, "(fp_line (start %.2f %.2f) (end %.2f %.2f) (layer F.CrtYd) (width 0.1))\n", r, b, l, b);
+         fprintf (path, "(fp_poly (pts (xy %f %f) (xy %f %f) (xy %f %f) (xy %f %f)) (layer F.Mask) (width 0))\n", l, b, l, t, r, t, r, b);
          fprintf (path, "(zone (net 0) (net_name \"\") (layer \"F.Cu\") (hatch edge 0.508)\n" "(connect_pads (clearance 0))\n"
-                  "(min_thickness 0.254)\n"
-                  "(keepout (tracks not_allowed) (vias not_allowed) (copperpour not_allowed) (footprints not_allowed))\n" "(fill (thermal_gap 0.508) (thermal_bridge_width 0.508))\n" "(polygon (pts (xy %f %f) (xy %f %f) (xy %f %f) (xy %f %f))))\n", l,b,l,t,r,t,r,b);
+                  "(min_thickness 0.254)\n" "(keepout (tracks not_allowed) (vias not_allowed) (copperpour not_allowed) (footprints not_allowed))\n" "(fill (thermal_gap 0.508) (thermal_bridge_width 0.508))\n" "(polygon (pts (xy %f %f) (xy %f %f) (xy %f %f) (xy %f %f))))\n", l, b, l, t, r, t, r, b);
       }
       fprintf (path, ")\n");
    }
